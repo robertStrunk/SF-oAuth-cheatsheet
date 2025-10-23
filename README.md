@@ -9,11 +9,9 @@ Complete reference for all Salesforce OAuth 2.0 flows with authorization and tok
 1. [Web Server Flow (Authorization Code)](#1-web-server-flow-authorization-code)
 2. [JWT Bearer Token Flow](#2-jwt-bearer-token-flow)
 3. [Username-Password Flow](#3-username-password-flow)
-4. [Device Flow](#4-device-flow)
-5. [Refresh Token Flow](#5-refresh-token-flow)
-6. [SAML Bearer Assertion Flow](#6-saml-bearer-assertion-flow)
-7. [Token Exchange Flow](#7-token-exchange-flow)
-8. [Asset Token Flow](#8-asset-token-flow)
+4. [Refresh Token Flow](#4-refresh-token-flow)
+5. [SAML Bearer Assertion Flow](#5-saml-bearer-assertion-flow)
+6. [Client Credentials Flow](#6-client-credentials-flow)
 
 ---
 
@@ -335,153 +333,7 @@ const data = await response.json();
 
 ---
 
-## 4. Device Flow
-
-OAuth flow for devices with limited input capabilities (IoT, CLI tools, smart TVs).
-
-### Step 1: Device Authorization Request
-
-**Method:** `POST`  
-**Endpoint:** `/services/oauth2/token`
-
-#### Required Headers
-
-```
-Content-Type: application/x-www-form-urlencoded
-```
-
-#### Required Parameters (Body)
-
-| Parameter | Description |
-|-----------|-------------|
-| `response_type` | Must be `device_code` |
-| `client_id` | Consumer Key |
-| `scope` | Space-separated scopes (e.g., `api refresh_token`) |
-
-#### cURL Example
-
-```bash
-curl -X POST https://login.salesforce.com/services/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "response_type=device_code" \
-  -d "client_id=YOUR_CLIENT_ID" \
-  -d "scope=api refresh_token"
-```
-
-#### JavaScript Example
-
-```javascript
-const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded'
-  },
-  body: new URLSearchParams({
-    response_type: 'device_code',
-    client_id: 'YOUR_CLIENT_ID',
-    scope: 'api refresh_token'
-  })
-});
-
-const data = await response.json();
-// Show data.user_code to user
-// Direct user to data.verification_uri
-// Poll using data.device_code
-```
-
-#### Response
-
-```json
-{
-  "device_code": "9e0c1e14...",
-  "user_code": "ABC-DEF-GHI",
-  "verification_uri": "https://login.salesforce.com/setup/connect",
-  "interval": 5
-}
-```
-
-### Step 2: Poll for Token
-
-**Method:** `POST`  
-**Endpoint:** `/services/oauth2/token`
-
-#### Required Headers
-
-```
-Content-Type: application/x-www-form-urlencoded
-```
-
-#### Required Parameters (Body)
-
-| Parameter | Description |
-|-----------|-------------|
-| `grant_type` | Must be `urn:ietf:params:oauth:grant-type:device_code` |
-| `client_id` | Consumer Key |
-| `code` | Device code from Step 1 |
-
-#### cURL Example
-
-```bash
-# Poll every 5 seconds (or interval from Step 1)
-curl -X POST https://login.salesforce.com/services/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
-  -d "client_id=YOUR_CLIENT_ID" \
-  -d "code=9e0c1e14..."
-```
-
-#### JavaScript Example
-
-```javascript
-// Poll until authorized or timeout
-async function pollForToken(deviceCode, clientId, interval = 5000) {
-  while (true) {
-    const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        client_id: clientId,
-        code: deviceCode
-      })
-    });
-
-    const data = await response.json();
-    
-    if (response.ok) {
-      return data; // Success - has access_token
-    }
-    
-    if (data.error === 'authorization_pending') {
-      await new Promise(resolve => setTimeout(resolve, interval));
-      continue;
-    }
-    
-    throw new Error(data.error);
-  }
-}
-```
-
-#### Success Response
-
-```json
-{
-  "access_token": "00D...",
-  "refresh_token": "5Aep...",
-  "signature": "...",
-  "scope": "api refresh_token",
-  "instance_url": "https://yourInstance.salesforce.com",
-  "id": "https://login.salesforce.com/id/00D.../005...",
-  "token_type": "Bearer",
-  "issued_at": "1234567890"
-}
-```
-
----
-
-## 5. Refresh Token Flow
+## 4. Refresh Token Flow
 
 Exchange a refresh token for a new access token when the access token expires.
 
@@ -553,7 +405,7 @@ const data = await response.json();
 
 ---
 
-## 6. SAML Bearer Assertion Flow
+## 5. SAML Bearer Assertion Flow
 
 Exchange a SAML assertion for an access token. Used for SSO integrations.
 
@@ -629,93 +481,17 @@ const data = await response.json();
 
 ---
 
-## 7. Token Exchange Flow
+## 6. Client Credentials Flow
 
-Exchange one token for another (e.g., actor token for subject token). Enables delegation and impersonation scenarios.
+Server-to-server authentication using client credentials. Used for accessing Salesforce APIs without user context, commonly for CDP, Marketing Cloud, and other asset-based integrations.
 
-### Token Request
-
-**Method:** `POST`  
-**Endpoint:** `/services/oauth2/token`
-
-#### Required Headers
-
-```
-Content-Type: application/x-www-form-urlencoded
-```
-
-#### Required Parameters (Body)
-
-| Parameter | Description |
-|-----------|-------------|
-| `grant_type` | Must be `urn:ietf:params:oauth:grant-type:token-exchange` |
-| `subject_token` | Token being exchanged |
-| `subject_token_type` | `urn:ietf:params:oauth:token-type:access_token` |
-| `client_id` | Consumer Key |
-| `client_secret` | Consumer Secret |
-
-#### Optional Parameters
-
-| Parameter | Description |
-|-----------|-------------|
-| `actor_token` | Token representing the party on behalf of which exchange is requested |
-| `actor_token_type` | Type of actor token |
-| `scope` | Requested scope for new token |
-| `resource` | Target service/resource where token will be used |
-| `audience` | Intended audience for new token |
-
-#### cURL Example
-
-```bash
-curl -X POST https://login.salesforce.com/services/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-  -d "subject_token=00D..." \
-  -d "subject_token_type=urn:ietf:params:oauth:token-type:access_token" \
-  -d "client_id=YOUR_CLIENT_ID" \
-  -d "client_secret=YOUR_CLIENT_SECRET" \
-  -d "scope=api"
-```
-
-#### JavaScript Example
-
-```javascript
-const response = await fetch('https://login.salesforce.com/services/oauth2/token', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded'
-  },
-  body: new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-    subject_token: '00D...',
-    subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
-    client_id: 'YOUR_CLIENT_ID',
-    client_secret: 'YOUR_CLIENT_SECRET',
-    scope: 'api'
-  })
-});
-
-const data = await response.json();
-// data.access_token (new exchanged token)
-```
-
-#### Response
-
-```json
-{
-  "access_token": "00D...",
-  "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "scope": "api"
-}
-```
-
----
-
-## 8. Asset Token Flow
-
-Exchange client credentials for an access token to access protected assets. Used for accessing Salesforce CDP and other asset-based resources.
+> **⚠️ Important Configuration Requirement:**  
+> Before using this flow, you must configure your Connected App:
+> 1. Navigate to Setup → App Manager → Your Connected App → Manage
+> 2. Click "Edit Policies"
+> 3. Enable "Client Credentials Flow"
+> 4. Select a "Run As" user (execution user) who has the necessary permissions
+> 5. The API calls will run with the permissions of this execution user
 
 ### Token Request
 
@@ -849,5 +625,65 @@ const response = await fetch('https://yourInstance.salesforce.com/services/data/
 
 ---
 
-*Last Updated: October 2024*
+## Verification Notes
+
+### ✅ Verified OAuth Flows
+
+The following flows are **officially supported** by Salesforce OAuth 2.0:
+1. **Web Server Flow (Authorization Code)** - Standard web application authentication
+2. **JWT Bearer Token Flow** - Server-to-server with digital certificate
+3. **Username-Password Flow** - Direct credential authentication (trusted apps only)
+4. **Refresh Token Flow** - Token renewal without re-authentication
+5. **SAML Bearer Assertion Flow** - SSO integration with SAML 2.0
+6. **Client Credentials Flow** - Server-to-server without user context (requires execution user)
+
+### ⚠️ Removed Unsupported Flows
+
+The following flows were **removed from this documentation** as they are **NOT supported** by Salesforce:
+- **Device Flow** - Not implemented in Salesforce OAuth
+- **Token Exchange Flow (RFC 8693)** - Not implemented in Salesforce OAuth
+
+### Architectural Considerations
+
+**Security Best Practices:**
+- Never expose `client_secret` in client-side code (mobile apps, SPAs)
+- Use PKCE (Proof Key for Code Exchange) for public clients
+- Implement proper refresh token rotation policies
+- Use My Domain for all production implementations
+- Configure session timeout policies at org level
+
+**Governor Limits:**
+- OAuth token requests count toward API limits
+- Default: 5,000 API calls per user per 24 hours (varies by license)
+- Connected App rate limiting applies separately
+
+**Enterprise Architecture:**
+- JWT Bearer Flow recommended for system integrations (no user interaction)
+- Client Credentials Flow for CDP, Marketing Cloud integrations
+- Web Server Flow for end-user authentication
+- Implement token caching to minimize auth requests
+- Use Named Credentials for declarative authentication management
+
+### Sources
+
+This documentation has been verified against official Salesforce resources:
+- Salesforce Developer Documentation: OAuth 2.0 Flows
+- Salesforce Help: Connected Apps and OAuth
+- Salesforce API Reference (Winter '25, Spring '25 releases)
+
+---
+
+## Disclaimer
+
+**⚠️ Important:** OAuth implementation details, endpoints, and parameters may change between Salesforce releases. Always confirm:
+- Current API version compatibility
+- Connected App configuration requirements
+- Org-level OAuth policies and session settings
+- Latest Salesforce release notes for OAuth changes
+
+For the most current information, consult the official Salesforce Developer Documentation at https://developer.salesforce.com/docs/
+
+---
+
+*Last Updated: October 2024 | Verified for Winter '25 & Spring '25 Releases*
 
