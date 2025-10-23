@@ -415,7 +415,7 @@ Content-Type: application/x-www-form-urlencoded
 
 | Parameter | Description |
 |-----------|-------------|
-| `grant_type` | Must be `device` |
+| `grant_type` | Must be `urn:ietf:params:oauth:grant-type:device_code` |
 | `client_id` | Consumer Key |
 | `code` | Device code from Step 1 |
 
@@ -425,7 +425,7 @@ Content-Type: application/x-www-form-urlencoded
 # Poll every 5 seconds (or interval from Step 1)
 curl -X POST https://login.salesforce.com/services/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=device" \
+  -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
   -d "client_id=YOUR_CLIENT_ID" \
   -d "code=9e0c1e14..."
 ```
@@ -442,7 +442,7 @@ async function pollForToken(deviceCode, clientId, interval = 5000) {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
-        grant_type: 'device',
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         client_id: clientId,
         code: deviceCode
       })
